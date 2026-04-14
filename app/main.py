@@ -29,6 +29,7 @@ app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 @app.middleware("http")
 async def attach_user_to_request(request: Request, call_next):
     """Load the authenticated user from the session and attach to request.state."""
+    
     session = request.scope.get("session")
     user_id = session.get("user_id") if session else None
     if user_id is not None:
