@@ -44,8 +44,8 @@ def seat_time_report(
             detail="start and end must be ISO 8601 datetime strings",
         )
 
-    # Pilots can only see their own data
-    if current_user.role == "pilot":
+    # Pilots and copilots can only see their own data
+    if current_user.role in ("pilot", "copilot"):
         target_user_id = current_user.id
     else:
         target_user_id = user_id  # None means all users

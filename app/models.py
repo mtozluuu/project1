@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Text, func
+from sqlalchemy import Date, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -23,11 +23,14 @@ class Flight(Base):
     __tablename__ = "flights"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    flight_number: Mapped[str] = mapped_column(String(20), nullable=False)
-    departure_time: Mapped[datetime] = mapped_column(nullable=False)
-    arrival_time: Mapped[datetime] = mapped_column(nullable=False)
-    origin: Mapped[str] = mapped_column(String(10), nullable=False)
-    destination: Mapped[str] = mapped_column(String(10), nullable=False)
+    flight_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    flight_date: Mapped[date] = mapped_column(Date, nullable=False)
+    departure_airport: Mapped[str] = mapped_column(String(10), nullable=False)
+    arrival_airport: Mapped[str] = mapped_column(String(10), nullable=False)
+    sched_dep: Mapped[datetime] = mapped_column(nullable=False)
+    sched_arr: Mapped[datetime] = mapped_column(nullable=False)
+    actual_dep: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    actual_arr: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     crew_assignments: Mapped[list["CrewAssignment"]] = relationship(back_populates="flight")

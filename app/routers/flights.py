@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone
 
 from typing import Optional
 
@@ -13,15 +13,21 @@ from app.models import CrewAssignment, Flight, MaintenanceLog, User
 
 router = APIRouter(prefix="/flights", tags=["flights"])
 
+VALID_SEATS = {"CAPTAIN", "FIRST_OFFICER"}
+SEAT_ROLE = {"CAPTAIN": "pilot", "FIRST_OFFICER": "copilot"}
+
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
 
 class CreateFlightRequest(BaseModel):
-    flight_number: str
-    departure_time: datetime
-    arrival_time: datetime
-    origin: str
-    destination: str
+    flight_no: str
+    flight_date: date
+    departure_airport: str
+    arrival_airport: str
+    sched_dep: datetime
+    sched_arr: datetime
+    actual_dep: Optional[datetime] = None
+    actual_arr: Optional[datetime] = None
 
 
 class CrewChangeRequest(BaseModel):
@@ -42,6 +48,20 @@ def _get_flight_or_404(flight_id: int, db: Session) -> Flight:
     return flight
 
 
+def _flight_dict(f: Flight) -> dict:
+    return {
+        "id": f.id,
+        "flight_no": f.flight_no,
+        "flight_date": f.flight_date,
+        "departure_airport": f.departure_airport,
+        "arrival_airport": f.arrival_airport,
+        "sched_dep": f.sched_dep,
+        "sched_arr": f.sched_arr,
+        "actual_dep": f.actual_dep,
+        "actual_arr": f.actual_arr,
+    }
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -52,23 +72,19 @@ def create_flight(
     _admin: User = Depends(require_role("admin")),
 ):
     flight = Flight(
-        flight_number=body.flight_number,
-        departure_time=body.departure_time,
-        arrival_time=body.arrival_time,
-        origin=body.origin,
-        destination=body.destination,
+        flight_no=body.flight_no,
+        flight_date=body.flight_date,
+        departure_airport=body.departure_airport,
+        arrival_airport=body.arrival_airport,
+        sched_dep=body.sched_dep,
+        sched_arr=body.sched_arr,
+        actual_dep=body.actual_dep,
+        actual_arr=body.actual_arr,
     )
     db.add(flight)
     db.commit()
     db.refresh(flight)
-    return {
-        "id": flight.id,
-        "flight_number": flight.flight_number,
-        "departure_time": flight.departure_time,
-        "arrival_time": flight.arrival_time,
-        "origin": flight.origin,
-        "destination": flight.destination,
-    }
+    return _flight_dict(flight)
 
 
 @router.get("")
@@ -80,26 +96,15 @@ def list_flights(
     query = db.query(Flight)
     if date is not None:
         try:
-            parsed = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            parsed_date = datetime.strptime(date, "%Y-%m-%d").date()
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="date must be in YYYY-MM-DD format",
             )
-        next_day = parsed + timedelta(days=1)
-        query = query.filter(and_(Flight.departure_time >= parsed, Flight.departure_time < next_day))
-    flights = query.order_by(Flight.departure_time).all()
-    return [
-        {
-            "id": f.id,
-            "flight_number": f.flight_number,
-            "departure_time": f.departure_time,
-            "arrival_time": f.arrival_time,
-            "origin": f.origin,
-            "destination": f.destination,
-        }
-        for f in flights
-    ]
+        query = query.filter(Flight.flight_date == parsed_date)
+    flights = query.order_by(Flight.sched_dep).all()
+    return [_flight_dict(f) for f in flights]
 
 
 @router.post("/{flight_id}/crew/change", status_code=status.HTTP_200_OK)
@@ -112,12 +117,31 @@ def change_crew(
 ):
     _get_flight_or_404(flight_id, db)
 
+    seat = body.seat.upper()
+    if seat not in VALID_SEATS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"seat must be one of: {', '.join(sorted(VALID_SEATS))}",
+        )
+
+    # Verify the target user exists and has the correct role for this seat
+    new_user = db.query(User).filter(User.id == body.user_id).first()
+    if new_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    required_role = SEAT_ROLE[seat]
+    if new_user.role != required_role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Seat {seat} requires a user with role '{required_role}'",
+        )
+
     # End any active assignment for this seat on this flight
     active = (
         db.query(CrewAssignment)
         .filter(
             CrewAssignment.flight_id == flight_id,
-            CrewAssignment.seat == body.seat,
+            CrewAssignment.seat == seat,
             CrewAssignment.end_time.is_(None),
         )
         .first()
@@ -126,15 +150,10 @@ def change_crew(
     if active:
         active.end_time = now
 
-    # Verify the target user exists
-    new_user = db.query(User).filter(User.id == body.user_id).first()
-    if new_user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
     assignment = CrewAssignment(
         flight_id=flight_id,
         user_id=body.user_id,
-        seat=body.seat,
+        seat=seat,
         start_time=now,
     )
     db.add(assignment)
@@ -252,3 +271,4 @@ def get_maintenance_logs(
         }
         for lg in logs
     ]
+

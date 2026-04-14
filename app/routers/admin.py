@@ -12,7 +12,7 @@ from app.models import User
 router = APIRouter(prefix="/admin", tags=["admin"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-VALID_ROLES = {"admin", "pilot", "crew", "maintenance"}
+VALID_ROLES = {"admin", "pilot", "copilot", "technician"}
 
 
 class CreateUserRequest(BaseModel):
