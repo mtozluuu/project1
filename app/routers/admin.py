@@ -16,7 +16,6 @@ VALID_ROLES = {"admin", "pilot", "crew", "maintenance"}
 
 
 class CreateUserRequest(BaseModel):
-    username: str
     password: str
     role: str
 
@@ -33,18 +32,14 @@ def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid role. Must be one of: {', '.join(sorted(VALID_ROLES))}",
         )
-    existing = db.query(User).filter(User.username == body.username).first()
-    if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
     user = User(
-        username=body.username,
         password_hash=pwd_context.hash(body.password),
         role=body.role,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-    return {"id": user.id, "username": user.username, "role": user.role}
+    return {"id": user.id, "role": user.role}
 
 
 @router.get("/users")
@@ -57,4 +52,4 @@ def list_users(
     if role is not None:
         query = query.filter(User.role == role)
     users = query.all()
-    return [{"id": u.id, "username": u.username, "role": u.role} for u in users]
+    return [{"id": u.id, "role": u.role} for u in users]

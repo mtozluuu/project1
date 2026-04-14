@@ -4,6 +4,7 @@ Usage:
     python scripts/seed_admin.py
 
 Reads DATABASE_URL from .env or environment variables.
+Prints the generated numeric user id on success.
 """
 
 import os
@@ -22,27 +23,18 @@ if not DATABASE_URL:
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-ADMIN_USERNAME = os.environ.get("SEED_ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "admin123")
 
 engine = create_engine(DATABASE_URL)
 
 with engine.begin() as conn:
-    existing = conn.execute(
-        text("SELECT id FROM users WHERE username = :u"),
-        {"u": ADMIN_USERNAME},
-    ).fetchone()
-
-    if existing:
-        print(f"Admin user '{ADMIN_USERNAME}' already exists (id={existing[0]}). Skipping.")
-    else:
-        hashed = pwd_context.hash(ADMIN_PASSWORD)
-        result = conn.execute(
-            text(
-                "INSERT INTO users (username, password_hash, role) "
-                "VALUES (:u, :h, 'admin') RETURNING id"
-            ),
-            {"u": ADMIN_USERNAME, "h": hashed},
-        )
-        new_id = result.fetchone()[0]
-        print(f"Created admin user '{ADMIN_USERNAME}' with id={new_id}.")
+    hashed = pwd_context.hash(ADMIN_PASSWORD)
+    result = conn.execute(
+        text(
+            "INSERT INTO users (password_hash, role) "
+            "VALUES (:h, 'admin') RETURNING id"
+        ),
+        {"h": hashed},
+    )
+    new_id = result.fetchone()[0]
+    print(f"Created admin user with id={new_id}. Use this id to log in.")
