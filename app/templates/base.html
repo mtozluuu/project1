@@ -15,7 +15,7 @@
         <a href="/docs">Docs</a>
         <a href="/redoc">ReDoc</a>
         {% if user %}
-            <a href="/login">Login</a>
+            <a href="/auth/logout">Logout ({{ user.role }})</a>
         {% else %}
             <a href="/login">Login</a>
         {% endif %}

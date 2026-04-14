@@ -91,14 +91,14 @@ def ui_login_post(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    user: User | None = db.query(User).filter(User.id == user_id).first()
-    if user is None or not _ui_pwd_context.verify(password, user.password_hash):
+    found_user: User | None = db.query(User).filter(User.id == user_id).first()
+    if found_user is None or not _ui_pwd_context.verify(password, found_user.password_hash):
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "user": None, "error": "Invalid user ID or password."},
             status_code=401,
         )
-    request.session["user_id"] = user.id
+    request.session["user_id"] = found_user.id
     return RedirectResponse(url="/ui/flights", status_code=303)
 
 
