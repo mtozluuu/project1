@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Flights – Flight Management{% endblock %}
+
+{% block content %}
+<h1>Flights</h1>
+
+{% if not user %}
+<div class="alert alert-error">
+    You must be <a href="/login">logged in</a> to view flights.
+</div>
+{% else %}
+
+{% if flights %}
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Flight No</th>
+                <th>Date</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Sched Dep</th>
+                <th>Sched Arr</th>
+                <th>Actual Dep</th>
+                <th>Actual Arr</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in flights %}
+            <tr>
+                <td>{{ f.id }}</td>
+                <td>{{ f.flight_no }}</td>
+                <td>{{ f.flight_date }}</td>
+                <td>{{ f.departure_airport }}</td>
+                <td>{{ f.arrival_airport }}</td>
+                <td>{{ f.sched_dep }}</td>
+                <td>{{ f.sched_arr }}</td>
+                <td>{{ f.actual_dep or "—" }}</td>
+                <td>{{ f.actual_arr or "—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No flights found.</p>
+{% endif %}
+
+{% endif %}
+{% endblock %}

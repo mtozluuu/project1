@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Flight Management{% endblock %}</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <nav>
+        <a class="brand" href="/ui">✈ Flight Mgmt</a>
+        <a href="/ui">Home</a>
+        <a href="/ui/flights">Flights</a>
+        <a href="/health">Health</a>
+        <a href="/docs">Docs</a>
+        <a href="/redoc">ReDoc</a>
+        {% if user %}
+            <a href="/login">Login</a>
+        {% else %}
+            <a href="/login">Login</a>
+        {% endif %}
+    </nav>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        &copy; 2024 Flight Management API
+    </footer>
+</body>
+</html>

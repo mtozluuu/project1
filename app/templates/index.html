@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Home – Flight Management{% endblock %}
+
+{% block content %}
+<h1>Welcome to Flight Management</h1>
+<p>Use the navigation above or the quick links below to get started.</p>
+
+<div class="cards">
+    <div class="card">
+        <h3>✈ Flights</h3>
+        <a class="btn btn-primary" href="/ui/flights">View Flights</a>
+    </div>
+    <div class="card">
+        <h3>🔐 Login</h3>
+        <a class="btn btn-primary" href="/login">Sign In</a>
+    </div>
+    <div class="card">
+        <h3>📄 API Docs</h3>
+        <a class="btn btn-secondary" href="/docs">Swagger UI</a>
+    </div>
+    <div class="card">
+        <h3>📘 ReDoc</h3>
+        <a class="btn btn-secondary" href="/redoc">ReDoc</a>
+    </div>
+    <div class="card">
+        <h3>❤ Health</h3>
+        <a class="btn btn-secondary" href="/health">Check Status</a>
+    </div>
+</div>
+{% endblock %}
