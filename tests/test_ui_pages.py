@@ -177,5 +177,5 @@ def test_create_note_redirects_gracefully_when_notes_table_missing(monkeypatch):
         response = test_client.post("/flight-detail/6/notes", data={"note": "test note"}, follow_redirects=False)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/flight-detail/6?note_status=unavailable"
+    assert response.headers["location"].endswith("/flight-detail/6?note_status=unavailable")
     assert any(s.rolled_back for s in sessions)

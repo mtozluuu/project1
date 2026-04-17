@@ -94,7 +94,12 @@ def flights_ui(request: Request):
 
 
 def _is_missing_flight_notes_table_error(exc: Exception) -> bool:
-    message = str(exc).lower()
+    # Keep checks compatible with PostgreSQL (UndefinedTable) and SQLite ("no such table")
+    # so local/dev databases with lagging schema degrade gracefully.
+    original_error = getattr(exc, "orig", None)
+    if getattr(original_error, "pgcode", None) == "42P01":  # PostgreSQL UndefinedTable
+        return True
+    message = str(original_error or exc).lower()
     return "flight_notes" in message and (
         "does not exist" in message or "undefinedtable" in message or "no such table" in message
     )
@@ -102,9 +107,9 @@ def _is_missing_flight_notes_table_error(exc: Exception) -> bool:
 
 @app.get("/flight-detail/{flight_id}", include_in_schema=False)
 def flight_detail(request: Request, flight_id: int):
-    _db = SessionLocal()
+    db = SessionLocal()
     try:
-        flight = _db.query(Flight).filter(Flight.id == flight_id).first()
+        flight = db.query(Flight).filter(Flight.id == flight_id).first()
         if flight is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight not found")
 
@@ -112,7 +117,7 @@ def flight_detail(request: Request, flight_id: int):
         notes_table_available = True
         try:
             notes = (
-                _db.query(FlightNote)
+                db.query(FlightNote)
                 .filter(FlightNote.flight_id == flight_id)
                 .order_by(FlightNote.created_at.desc())
                 .all()
@@ -120,7 +125,7 @@ def flight_detail(request: Request, flight_id: int):
         except (ProgrammingError, OperationalError) as exc:
             if not _is_missing_flight_notes_table_error(exc):
                 raise
-            _db.rollback()
+            db.rollback()
             notes_table_available = False
 
         return templates.TemplateResponse(
@@ -134,44 +139,46 @@ def flight_detail(request: Request, flight_id: int):
             },
         )
     finally:
-        _db.close()
+        db.close()
 
 
 @app.post("/flight-detail/{flight_id}/notes", include_in_schema=False)
 def create_flight_note(request: Request, flight_id: int, note: str = Form(...)):
-    _db = SessionLocal()
+    db = SessionLocal()
     try:
-        flight = _db.query(Flight).filter(Flight.id == flight_id).first()
+        flight = db.query(Flight).filter(Flight.id == flight_id).first()
         if flight is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight not found")
 
         note_text = note.strip()
         if not note_text:
             return RedirectResponse(
-                url=f"/flight-detail/{flight_id}?note_status=empty",
+                url=str(request.url_for("flight_detail", flight_id=flight_id).include_query_params(note_status="empty")),
                 status_code=status.HTTP_303_SEE_OTHER,
             )
 
         user = getattr(request.state, "user", None)
         new_note = FlightNote(flight_id=flight_id, user_id=getattr(user, "id", None), note=note_text)
-        _db.add(new_note)
+        db.add(new_note)
         try:
-            _db.commit()
+            db.commit()
         except (ProgrammingError, OperationalError) as exc:
             if not _is_missing_flight_notes_table_error(exc):
                 raise
-            _db.rollback()
+            db.rollback()
             return RedirectResponse(
-                url=f"/flight-detail/{flight_id}?note_status=unavailable",
+                url=str(
+                    request.url_for("flight_detail", flight_id=flight_id).include_query_params(note_status="unavailable")
+                ),
                 status_code=status.HTTP_303_SEE_OTHER,
             )
 
         return RedirectResponse(
-            url=f"/flight-detail/{flight_id}?note_status=created",
+            url=str(request.url_for("flight_detail", flight_id=flight_id).include_query_params(note_status="created")),
             status_code=status.HTTP_303_SEE_OTHER,
         )
     finally:
-        _db.close()
+        db.close()
 
 
 @app.get("/health")
