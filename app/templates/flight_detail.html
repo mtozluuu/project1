@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Flight Detail – Flight Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Flight Detail</h2>
+    <p><strong>ID:</strong> {{ flight.id }}</p>
+    <p><strong>Flight #:</strong> {{ flight.flight_no }}</p>
+    <p><strong>Date:</strong> {{ flight.flight_date }}</p>
+    <p><strong>Route:</strong> {{ flight.departure_airport }} → {{ flight.arrival_airport }}</p>
+    <p><strong>Scheduled:</strong> {{ flight.sched_dep }} → {{ flight.sched_arr }}</p>
+</div>
+
+<div class="card">
+    <h3>Notes</h3>
+    {% if note_status == "created" %}
+    <p class="alert alert-success">Note added.</p>
+    {% elif note_status == "empty" %}
+    <p class="alert alert-warning">Note cannot be empty.</p>
+    {% elif note_status == "unavailable" %}
+    <p class="alert alert-warning">Notes are temporarily unavailable.</p>
+    {% endif %}
+
+    {% if notes %}
+    <ul>
+        {% for n in notes %}
+        <li>{{ n.note }} <small>({{ n.created_at }})</small></li>
+        {% endfor %}
+    </ul>
+    {% elif notes_table_available %}
+    <p class="alert alert-info">No notes yet.</p>
+    {% else %}
+    <p class="alert alert-info">No notes available.</p>
+    {% endif %}
+
+    <form method="post" action="/flight-detail/{{ flight.id }}/notes">
+        <label for="note">Add note</label>
+        <textarea id="note" name="note" rows="4" required></textarea>
+        <div class="btn-group">
+            <button class="btn btn-primary" type="submit">Add note</button>
+            <a class="btn btn-secondary" href="/flights-ui">Back to flights</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
