@@ -2,15 +2,17 @@ import os
 import warnings
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Form, HTTPException, Request, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.database import get_db, SessionLocal
-from app.models import Flight, User
+from app.models import Flight, FlightNote, User
 from app.routers import auth, admin, flights, reports
 from app.seed import seed_admin
 
@@ -89,6 +91,87 @@ def flights_ui(request: Request):
         finally:
             _db.close()
     return templates.TemplateResponse(request, "flights.html", {"flights": flight_list})
+
+
+def _is_missing_flight_notes_table_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "flight_notes" in message and (
+        "does not exist" in message or "undefinedtable" in message or "no such table" in message
+    )
+
+
+@app.get("/flight-detail/{flight_id}", include_in_schema=False)
+def flight_detail(request: Request, flight_id: int):
+    _db = SessionLocal()
+    try:
+        flight = _db.query(Flight).filter(Flight.id == flight_id).first()
+        if flight is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight not found")
+
+        notes = []
+        notes_table_available = True
+        try:
+            notes = (
+                _db.query(FlightNote)
+                .filter(FlightNote.flight_id == flight_id)
+                .order_by(FlightNote.created_at.desc())
+                .all()
+            )
+        except (ProgrammingError, OperationalError) as exc:
+            if not _is_missing_flight_notes_table_error(exc):
+                raise
+            _db.rollback()
+            notes_table_available = False
+
+        return templates.TemplateResponse(
+            request,
+            "flight_detail.html",
+            {
+                "flight": flight,
+                "notes": notes,
+                "notes_table_available": notes_table_available,
+                "note_status": request.query_params.get("note_status"),
+            },
+        )
+    finally:
+        _db.close()
+
+
+@app.post("/flight-detail/{flight_id}/notes", include_in_schema=False)
+def create_flight_note(request: Request, flight_id: int, note: str = Form(...)):
+    _db = SessionLocal()
+    try:
+        flight = _db.query(Flight).filter(Flight.id == flight_id).first()
+        if flight is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flight not found")
+
+        note_text = note.strip()
+        if not note_text:
+            return RedirectResponse(
+                url=f"/flight-detail/{flight_id}?note_status=empty",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+
+        user = getattr(request.state, "user", None)
+        new_note = FlightNote(flight_id=flight_id, user_id=getattr(user, "id", None), note=note_text)
+        _db.add(new_note)
+        try:
+            _db.commit()
+        except (ProgrammingError, OperationalError) as exc:
+            if not _is_missing_flight_notes_table_error(exc):
+                raise
+            _db.rollback()
+            return RedirectResponse(
+                url=f"/flight-detail/{flight_id}?note_status=unavailable",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+
+        return RedirectResponse(
+            url=f"/flight-detail/{flight_id}?note_status=created",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    finally:
+        _db.close()
 
 
 @app.get("/health")

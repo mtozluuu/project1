@@ -36,6 +36,7 @@ class Flight(Base):
 
     crew_assignments: Mapped[list["CrewAssignment"]] = relationship(back_populates="flight")
     maintenance_logs: Mapped[list["MaintenanceLog"]] = relationship(back_populates="flight")
+    notes: Mapped[list["FlightNote"]] = relationship(back_populates="flight")
 
 
 class CrewAssignment(Base):
@@ -63,3 +64,16 @@ class MaintenanceLog(Base):
 
     flight: Mapped["Flight"] = relationship(back_populates="maintenance_logs")
     user: Mapped["User"] = relationship(back_populates="maintenance_logs")
+
+
+class FlightNote(Base):
+    __tablename__ = "flight_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    flight_id: Mapped[int] = mapped_column(ForeignKey("flights.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    note: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+    flight: Mapped["Flight"] = relationship(back_populates="notes")
+    user: Mapped[Optional["User"]] = relationship()
